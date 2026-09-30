@@ -1,15 +1,15 @@
 import sys
 import pygame
-from fractal import DualFractalEngine
+from fractal import UniversalFractalEngine
 
 pygame.init()
 pygame.font.init()
 
 # --- Config ---
-WINDOW_WIDTH = 1000
-WINDOW_HEIGHT = 700
+WINDOW_WIDTH = 1080
+WINDOW_HEIGHT = 720
 CANVAS_WIDTH = 750
-CANVAS_HEIGHT = 700
+CANVAS_HEIGHT = 720
 SIDEBAR_WIDTH = WINDOW_WIDTH - CANVAS_WIDTH
 
 BG_COLOR = (18, 18, 24)
@@ -20,22 +20,20 @@ DRAW_COLOR = (255, 215, 0)
 TEXT_COLOR = (220, 225, 235)
 SUBTEXT_COLOR = (140, 145, 165)
 
-JULIA_BTN_COLOR = (88, 101, 242)
-JULIA_BTN_HOVER = (105, 118, 255)
-IFS_BTN_COLOR = (40, 167, 69)
-IFS_BTN_HOVER = (55, 185, 85)
+BTN_COLOR = (52, 58, 70)
+BTN_HOVER = (70, 78, 95)
 CLEAR_BTN_COLOR = (220, 53, 69)
 CLEAR_BTN_HOVER = (240, 73, 89)
 
-TITLE_FONT = pygame.font.SysFont("Segoe UI", 22, bold=True)
-BODY_FONT = pygame.font.SysFont("Segoe UI", 14)
-BTN_FONT = pygame.font.SysFont("Segoe UI", 15, bold=True)
+TITLE_FONT = pygame.font.SysFont("Segoe UI", 20, bold=True)
+BODY_FONT = pygame.font.SysFont("Segoe UI", 13)
+BTN_FONT = pygame.font.SysFont("Segoe UI", 13, bold=True)
 
 
 class DrawingApp:
     def __init__(self):
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-        pygame.display.set_caption("Dual Mode Fractal Generator")
+        pygame.display.set_caption("Wikipedia Fractal Taxonomy Generator")
         self.clock = pygame.time.Clock()
 
         self.canvas_surface = pygame.Surface((CANVAS_WIDTH, CANVAS_HEIGHT))
@@ -46,12 +44,20 @@ class DrawingApp:
         self.drawn_points = []
         self.mode = "DRAW"
 
-        self.fractal_engine = DualFractalEngine(CANVAS_WIDTH, CANVAS_HEIGHT)
+        self.engine = UniversalFractalEngine(CANVAS_WIDTH, CANVAS_HEIGHT)
 
-        # UI Buttons
-        self.btn_julia = pygame.Rect(CANVAS_WIDTH + 20, 120, SIDEBAR_WIDTH - 40, 45)
-        self.btn_ifs = pygame.Rect(CANVAS_WIDTH + 20, 175, SIDEBAR_WIDTH - 40, 45)
-        self.btn_clear = pygame.Rect(CANVAS_WIDTH + 20, 235, SIDEBAR_WIDTH - 40, 40)
+        # 7 Wikipedia Fractal Category Buttons
+        btn_x, btn_w, btn_h = CANVAS_WIDTH + 15, SIDEBAR_WIDTH - 30, 38
+        self.buttons = {
+            "ESCAPE_TIME": (pygame.Rect(btn_x, 90, btn_w, btn_h), "1. Escape-Time Set"),
+            "IFS": (pygame.Rect(btn_x, 135, btn_w, btn_h), "2. IFS Branching"),
+            "LSYSTEM": (pygame.Rect(btn_x, 180, btn_w, btn_h), "3. L-System Rewrite"),
+            "ATTRACTOR": (pygame.Rect(btn_x, 225, btn_w, btn_h), "4. Strange Attractor"),
+            "RANDOM_DLA": (pygame.Rect(btn_x, 270, btn_w, btn_h), "5. Random / DLA"),
+            "SUBDIVISION": (pygame.Rect(btn_x, 315, btn_w, btn_h), "6. Finite Subdivision"),
+            "SUBDIVISION_LINKS": (pygame.Rect(btn_x, 360, btn_w, btn_h), "7. Subdivision Links"),
+        }
+        self.btn_clear = pygame.Rect(btn_x, 420, btn_w, 38)
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -67,18 +73,17 @@ class DrawingApp:
                         self.last_pos = pos
                         self.drawn_points.append(pos)
                     elif self.mode == "FRACTAL":
-                        self.fractal_engine.handle_mouse_down(pos, event.button, self.drawn_points)
+                        self.engine.handle_mouse_down(pos, event.button, self.drawn_points)
 
                 elif event.button == 1:
-                    if self.btn_julia.collidepoint(pos) and len(self.drawn_points) > 5:
-                        self.mode = "FRACTAL"
-                        self.fractal_engine.reset_navigation()
-                        self.fractal_engine.generate_julia(self.drawn_points)
-                    elif self.btn_ifs.collidepoint(pos) and len(self.drawn_points) > 5:
-                        self.mode = "FRACTAL"
-                        self.fractal_engine.reset_navigation()
-                        self.fractal_engine.generate_ifs(self.drawn_points)
-                    elif self.btn_clear.collidepoint(pos):
+                    if len(self.drawn_points) > 5:
+                        for mode_key, (rect, _) in self.buttons.items():
+                            if rect.collidepoint(pos):
+                                self.mode = "FRACTAL"
+                                self.engine.reset_navigation()
+                                getattr(self.engine, f"generate_{mode_key.lower()}")(self.drawn_points)
+                                break
+                    if self.btn_clear.collidepoint(pos):
                         self.clear_canvas()
 
             elif event.type == pygame.MOUSEBUTTONUP:
@@ -86,7 +91,7 @@ class DrawingApp:
                     self.is_drawing = False
                     self.last_pos = None
                     if self.mode == "FRACTAL":
-                        self.fractal_engine.handle_mouse_up(event.button, self.drawn_points)
+                        self.engine.handle_mouse_up(event.button, self.drawn_points)
 
             elif event.type == pygame.MOUSEMOTION:
                 pos = event.pos
@@ -96,7 +101,7 @@ class DrawingApp:
                     self.last_pos = pos
                     self.drawn_points.append(pos)
                 elif self.mode == "FRACTAL" and self.is_on_canvas(pos):
-                    self.fractal_engine.handle_mouse_motion(pos)
+                    self.engine.handle_mouse_motion(pos)
 
     def is_on_canvas(self, pos):
         return 0 <= pos[0] < CANVAS_WIDTH and 0 <= pos[1] < CANVAS_HEIGHT
@@ -105,7 +110,7 @@ class DrawingApp:
         self.canvas_surface.fill(CANVAS_BG)
         self.drawn_points.clear()
         self.mode = "DRAW"
-        self.fractal_engine.reset_navigation()
+        self.engine.reset_navigation()
 
     def draw_ui(self):
         self.screen.fill(BG_COLOR)
@@ -113,50 +118,41 @@ class DrawingApp:
         pygame.draw.line(self.screen, PANEL_BORDER, (CANVAS_WIDTH, 0), (CANVAS_WIDTH, WINDOW_HEIGHT), 2)
 
         if self.mode == "FRACTAL":
-            self.fractal_engine.render(self.canvas_surface)
+            self.engine.render(self.canvas_surface)
         self.screen.blit(self.canvas_surface, (0, 0))
 
-        title = TITLE_FONT.render("Fractal Studio", True, TEXT_COLOR)
-        sub_text = BODY_FONT.render("Draw stroke & select mode", True, SUBTEXT_COLOR)
-        self.screen.blit(title, (CANVAS_WIDTH + 20, 25))
-        self.screen.blit(sub_text, (CANVAS_WIDTH + 20, 55))
-
-        status_str = f"Status: {self.mode} MODE"
-        status_color = (100, 220, 120) if self.mode == "DRAW" else (255, 180, 50)
-        status_txt = BODY_FONT.render(status_str, True, status_color)
-        self.screen.blit(status_txt, (CANVAS_WIDTH + 20, 85))
+        # Title Block
+        title = TITLE_FONT.render("Fractal Taxonomy Studio", True, TEXT_COLOR)
+        sub_text = BODY_FONT.render("Draw stroke & select generator:", True, SUBTEXT_COLOR)
+        self.screen.blit(title, (CANVAS_WIDTH + 15, 20))
+        self.screen.blit(sub_text, (CANVAS_WIDTH + 15, 48))
 
         mouse_pos = pygame.mouse.get_pos()
 
-        # Julia Button
-        j_col = JULIA_BTN_HOVER if self.btn_julia.collidepoint(mouse_pos) else JULIA_BTN_COLOR
-        pygame.draw.rect(self.screen, j_col, self.btn_julia, border_radius=8)
-        j_lbl = BTN_FONT.render("Generate Julia Set", True, (255, 255, 255))
-        self.screen.blit(j_lbl, j_lbl.get_rect(center=self.btn_julia.center))
-
-        # IFS Button
-        ifs_col = IFS_BTN_HOVER if self.btn_ifs.collidepoint(mouse_pos) else IFS_BTN_COLOR
-        pygame.draw.rect(self.screen, ifs_col, self.btn_ifs, border_radius=8)
-        ifs_lbl = BTN_FONT.render("Generate IFS Branch", True, (255, 255, 255))
-        self.screen.blit(ifs_lbl, ifs_lbl.get_rect(center=self.btn_ifs.center))
+        # Render 7 Category Buttons
+        for mode_key, (rect, label_text) in self.buttons.items():
+            col = BTN_HOVER if rect.collidepoint(mouse_pos) else BTN_COLOR
+            pygame.draw.rect(self.screen, col, rect, border_radius=6)
+            lbl = BTN_FONT.render(label_text, True, (255, 255, 255))
+            self.screen.blit(lbl, lbl.get_rect(center=rect.center))
 
         # Clear Button
         clr_col = CLEAR_BTN_HOVER if self.btn_clear.collidepoint(mouse_pos) else CLEAR_BTN_COLOR
-        pygame.draw.rect(self.screen, clr_col, self.btn_clear, border_radius=8)
-        clr_lbl = BTN_FONT.render("Clear Canvas", True, (255, 255, 255))
+        pygame.draw.rect(self.screen, clr_col, self.btn_clear, border_radius=6)
+        clr_lbl = BTN_FONT.render("Clear Drawing", True, (255, 255, 255))
         self.screen.blit(clr_lbl, clr_lbl.get_rect(center=self.btn_clear.center))
 
-        # Stats & Nav Info
+        # Status Footer
         pts_text = BODY_FONT.render(f"Stroke Points: {len(self.drawn_points)}", True, SUBTEXT_COLOR)
-        self.screen.blit(pts_text, (CANVAS_WIDTH + 20, 295))
+        self.screen.blit(pts_text, (CANVAS_WIDTH + 15, 480))
 
         if self.mode == "FRACTAL":
-            nav_hdr = BODY_FONT.render(f"Active Mode: {self.fractal_engine.type}", True, TEXT_COLOR)
-            pan_txt = BODY_FONT.render("• Drag left-click to Pan", True, SUBTEXT_COLOR)
+            nav_hdr = BODY_FONT.render(f"Active: {self.engine.mode}", True, TEXT_COLOR)
+            pan_txt = BODY_FONT.render("• Drag to Pan around", True, SUBTEXT_COLOR)
             zoom_txt = BODY_FONT.render("• Scroll wheel to Zoom", True, SUBTEXT_COLOR)
-            self.screen.blit(nav_hdr, (CANVAS_WIDTH + 20, 330))
-            self.screen.blit(pan_txt, (CANVAS_WIDTH + 20, 355))
-            self.screen.blit(zoom_txt, (CANVAS_WIDTH + 20, 375))
+            self.screen.blit(nav_hdr, (CANVAS_WIDTH + 15, 510))
+            self.screen.blit(pan_txt, (CANVAS_WIDTH + 15, 535))
+            self.screen.blit(zoom_txt, (CANVAS_WIDTH + 15, 555))
 
     def run(self):
         while True:
